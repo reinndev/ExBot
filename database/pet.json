@@ -1,0 +1,34 @@
+{
+    "pet1": {
+        "name": "pet1",
+        "description": "Meningkatkan Winrate saat melakukan !adventure sebanyak *15%*",
+        "effect": { "winrateBoost" : 0.15},
+        "rarity": "Epic",
+        "dropRate": 0.038
+    },
+    "pet2": {
+        "name": "pet2",
+        "description": "Mendapatkan Healing pasif sebesar 10HP setiap 5 menit, efek ini memiliki batasan 50% max HP",
+        "effect": { "heal": 10, "interval": 300},
+        "rarity": "Rare",
+        "dropRate": 0.05
+    },
+    "pet3": {
+        "name": "pet3",
+        "description": "Menerima 0 damage saat kalah dalam suatu pertaruangan, efek ini tidak bekerja pada Boss",
+        "effect": { "shield": 3, "rechargeTime": 2400 },
+        "rarity": "Legendary",
+        "dropRate": 0.01
+    },
+    "pet4": {
+        "name": "pet4",
+        "description": "Meningkatkan Winrate saat melakukan !adventure sebanyak *10%* juga menerima 0 damage saat kalah dalam suatu pertarungan, effect ini tidak bekerja pada Boss",
+        "effect": {
+            "winrateBoost": 0.1,
+            "shield": 3,
+            "rechargeTime": 2400
+        },
+        "rarity": "Mythical",
+        "dropRate": 0.002
+    }
+}

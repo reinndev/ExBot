@@ -1,0 +1,9 @@
+{
+    "1": {
+        "minLevel": 1,
+        "maxLevel": 10,
+        "baseChance": 0.5,
+        "scalePerLevel": 0.025,
+        "maxChance": 1
+    }
+}

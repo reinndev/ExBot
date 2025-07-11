@@ -2,6 +2,19 @@ const fs = require("fs");
 const { send } = require("process");
 const { text } = require("stream/consumers");
 
+// Load utils
+const {
+  passiveHealing: petHeal,
+  shieldRecharge: petShield,
+  rollHuntEvent: rngHunt,
+  getRandomPetByDropRate: getRandomPet,
+  getWinrate: getWR,
+  getUserWinrate: getUserWR,
+  checkLevelUp: levelUp,
+} = require("./lib/utils");
+
+const { start } = require("./index");
+
 // Load database
 const {
   userDb: db,
@@ -10,79 +23,16 @@ const {
   saveAreaDb,
   petDb,
   savePetDb,
-} = require("./database/database");
-
-// Hunt Events
-function rollHuntEvent() {
-  const events = [
-    { type: "pet", chance: 0.1 }, // 10%
-    { type: "monster", chance: 0.6 }, // 60%
-    { type: "none", chance: 0.3 }, // 30%
-  ];
-
-  const roll = Math.random();
-  console.log("Roll Event", roll);
-  let acc = 0;
-
-  for (const event of events) {
-    acc += event.chance;
-    if (roll < acc) return event.type;
-  }
-
-  return "none"; // fallback
-}
-
-// RNG Pet
-function getRandomPetByDropRate(petDb) {
-  const entries = Object.entries(petDb);
-  const roll = Math.random();
-  let acc = 0;
-  console.log("Roll:", roll);
-  console.log("Accumulated:", acc);
-
-  for (const [petId, pet] of entries) {
-    acc += pet.dropRate;
-    if (roll < acc) return { id: petId, ...pet };
-  }
-
-  // ⛑ Fallback: kalau gak ada yang lolos roll, ambil pet random dari list
-  const [fallbackId, fallbackPet] =
-    entries[Math.floor(Math.random() * entries.length)];
-  return { id: fallbackId, ...fallbackPet };
-}
-
-// Winrate level system
-function getWinrate(areaId, level) {
-  const config = areaDb[areaId];
-  if (!config) return 0.5;
-
-  if (level < config.minLevel) return 0.1;
-  if (level > config.maxLevel) return config.maxChance;
-
-  const scale = (level - config.minLevel) * config.scalePerLevel;
-  const chance = config.baseChance + scale;
-  return Math.min(chance, config.maxChance);
-}
-
-// Level Up System
-function checkLevelUp(user) {
-  let leveledUp = false;
-  let expNeeded = 50 + (user.level - 1) * 30;
-
-  while (user.exp >= expNeeded) {
-    user.exp -= expNeeded;
-    user.level += 1;
-    user.maxHealth += 10;
-    user.health = user.maxHealth;
-    leveledUp = true;
-  }
-
-  return leveledUp;
-}
+} = require("./lib/database");
 
 async function handleCommand(sock, msg, command, args) {
   const from = msg.key.remoteJid;
-  const sender = msg.key.participant || msg.key.remoteJid;
+  const sender = msg.key.participant || from;
+  const config = require("./config");
+  const isGroup = from.endsWith("@g.us");
+
+  // Whitelist check
+  if (isGroup && !config.allowedGroup.includes(from)) return;
 
   // Initialize User
   if (!db[sender]) {
@@ -92,6 +42,7 @@ async function handleCommand(sock, msg, command, args) {
       gold: 0,
       level: 1,
       exp: 0,
+      lastOnline: 0,
       pet: {},
     };
     saveDb();
@@ -100,9 +51,10 @@ async function handleCommand(sock, msg, command, args) {
   const user = db[sender];
 
   switch (command) {
-    // Di bagian case !profile atau !p
     case "!profile":
+    case "!prof":
     case "!p": {
+      const now = Math.floor(Date.now() / 1000);
       // New
       let target = sender;
       let isSelf = true;
@@ -125,6 +77,12 @@ async function handleCommand(sock, msg, command, args) {
         break;
       }
       const user = db[target];
+      const healed = isSelf ? petHeal(user) : 0;
+      if (isSelf) {
+        petHeal(user); // Apply healing if self
+        petShield(user); // Recharge shield if self
+        user.lastOnline = now; // Update last online time
+      }
       const displayName = isSelf ? `${targetName} (Kamu)` : targetName;
 
       if (!user) {
@@ -137,14 +95,15 @@ async function handleCommand(sock, msg, command, args) {
       }
 
       const pet = user.pet;
-      const now = Math.floor(Date.now() / 1000);
       const maxExp = 50 + (user.level - 1) * 30;
+      const wr = getUserWR(user);
       let profile =
         `━━━━━「 *RPG PROFILE* 」━━━━━\n\n` +
         `╰ 📝 User : ${displayName}\n` +
         `╰ ❤ HP : ${user.health}/${user.maxHealth}\n` +
         `╰ 🌟 Level : ${user.level} (${user.exp}/${maxExp})\n` +
-        `╰ 💰 Gold : ${user.gold}`;
+        `╰ 💰 Gold : ${user.gold}\n` +
+        `╰ Wr WR : ${(wr * 100).toFixed(1)}%`;
 
       // PETS
       if (pet && pet.id && petDb[pet.id]) {
@@ -157,41 +116,21 @@ async function handleCommand(sock, msg, command, args) {
         }
 
         if (effects.heal) {
-          const interval = effects.interval || 300;
-          const last = pet.lastHeal || 0;
-
-          if (now - last >= interval) {
-            const maxHeal = Math.floor(user.maxHealth * 0.5);
-            const currentMaxLimit = user.maxHealth - maxHeal;
-            const allowedHeal = Math.max(
-              0,
-              user.maxHealth - user.health - currentMaxLimit
-            );
-
-            if (allowedHeal > 0) {
-              const healAmount = Math.min(effects.heal, allowedHeal);
-              user.health = Math.min(user.health + healAmount, user.maxHealth);
-              pet.lastHeal = now;
-              saveDb(); // Jangan lupa simpan
-            }
+          const healValue = effects.heal;
+          lines.push(`- Heals ${healValue}HP every 1 minutes (max 50% HP)`);
+          if (isSelf && healed > 0) {
+            lines.push(`- Passive Heal: +${healed}HP applied`);
           }
-
-          const nextHeal = Math.max(0, interval - (now - pet.lastHeal));
-          const min = Math.floor(nextHeal / 60);
-          const sec = nextHeal % 60;
-          lines.push(
-            `- Heals ${effects.heal} HP (Next Heal in ${min} Minutes ${sec} Seconds, Max 50% HP)`
-          );
         }
 
         if (effects.shield) {
           const recharge = effects.rechargeTime || 2400;
           const last = pet.lastShieldRecharge || 0;
-          const nextShield = Math.max(0, recharge - (now - last));
-          const min = Math.floor(nextShield / 60);
-          const sec = nextShield % 60;
+          const next = Math.max(0, recharge - (now - last));
+          const min = Math.floor(next / 60);
+          const sec = next % 60;
           lines.push(
-            `- Shield (${pet.shields}/${effects.shield}) (Recharge in ${min} Minutes ${sec} Seconds)`
+            `- Shield (${pet.shields}/${pet.maxShields}) (Recharge in ${min}m ${sec}s)`
           );
         }
 
@@ -235,8 +174,12 @@ async function handleCommand(sock, msg, command, args) {
         break;
       }
 
-      const chance = getWinrate(area, user.level);
+      const chance = getUserWR(user);
       const won = Math.random() < chance;
+      const hasShield =
+        user.pet?.id &&
+        petDb[user.pet.id]?.effect?.shield &&
+        user.pet.shields > 0;
 
       if (won) {
         const goldGain = Math.floor(Math.random() * (50 - 10 + 1)) + 10;
@@ -248,7 +191,7 @@ async function handleCommand(sock, msg, command, args) {
           text: `━━━━━「 *ADVENTURE* 」━━━━━\n╰ ‼️ Kamu berjelajah dan bertemu kawanan _*Goblin*_\n╰ 💖 Kamu mengalahkan semua goblin\n\n╰ 💰 +${goldGain} Gold\n╰ 🌟 +${expGain} Exp`,
         });
 
-        if (checkLevelUp(db[sender])) {
+        if (levelUp(db[sender])) {
           await sock.sendMessage(
             from,
             {
@@ -258,14 +201,25 @@ async function handleCommand(sock, msg, command, args) {
           );
         }
       } else {
-        db[sender].health -= 10;
-        await sock.sendMessage(
-          from,
-          {
-            text: `━━━━━「 *ADVENTURE* 」━━━━━\n╰ ‼️ Kamu berjelajah dan bertemu kawanan _*Goblin*_\n╰ 💔 Para goblin mengalahkanmu\n\n╰ 💔 -10 HP `,
-          },
-          { quoted: msg }
-        );
+        if (hasShield) {
+          user.pet.shields -= 1;
+          await sock.sendMessage(
+            from,
+            {
+              text: `dilindungi`,
+            },
+            { quoted: msg }
+          );
+        } else {
+          db[sender].health -= 10;
+          await sock.sendMessage(
+            from,
+            {
+              text: `━━━━━「 *ADVENTURE* 」━━━━━\n╰ ‼️ Kamu berjelajah dan bertemu kawanan _*Goblin*_\n╰ 💔 Para goblin mengalahkanmu\n\n╰ 💔 -10 HP `,
+            },
+            { quoted: msg }
+          );
+        }
       }
       saveDb();
       break;
@@ -300,7 +254,7 @@ async function handleCommand(sock, msg, command, args) {
     // Hunt
     case "!hunt":
     case "!h":
-      const event = rollHuntEvent();
+      const event = rngHunt();
       let pet;
       // console.log('petsDb is', petDb)
       // console.log('Hunt Event', event)
@@ -318,7 +272,8 @@ async function handleCommand(sock, msg, command, args) {
       }
 
       if (event === "monster") {
-        const won = Math.random() > 0.5;
+        const chance = getUserWR(user);
+        const won = Math.random() < chance;
 
         if (won) {
           const goldGain = Math.floor(Math.random() * 15 + 10);
@@ -343,7 +298,7 @@ async function handleCommand(sock, msg, command, args) {
 
       if (event === "pet") {
         console.log("✅ Pet Event Triggered");
-        pet = getRandomPetByDropRate(petDb);
+        pet = getRandomPet(petDb);
 
         if (!pet) {
           await sock.sendMessage(

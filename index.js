@@ -7,6 +7,7 @@ const {
 const qrcode = require("qrcode-terminal");
 
 const { handleCommand } = require("./case"); // fitur kamu
+const { default: pino } = require("pino");
 
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("auth"); // Folder auth
@@ -15,6 +16,7 @@ async function startBot() {
   const sock = makeWASocket({
     version,
     auth: state,
+    logger: pino({ level: "error" }),
   });
 
   sock.ev.on("creds.update", saveCreds);
@@ -45,11 +47,22 @@ async function startBot() {
 
     const from = msg.key.remoteJid;
     const body =
-      msg.message.conversation || msg.message.extendedTextMessage?.text;
+    msg.message.conversation || msg.message.extendedTextMessage?.text;
     if (!body) return;
 
+    const start = Date.now();
+    
     const [command, ...args] = body.trim().split(" ");
     await handleCommand(sock, msg, command.toLowerCase(), args);
+    const end = Date.now();
+      const elapsed = end - start;
+      const jid = msg.key.remoteJid;
+      const name = msg.pushName || "Unknown";
+      const bodyMsg = msg.message?.conversation || msg.message?.extendedTextMessage?.text || "(No Text)";
+
+      process.stdout.write(
+        `\r📩 From: ${name} | Msg: "${bodyMsg}" | Delay: ${elapsed}ms`
+      )
   });
 }
 

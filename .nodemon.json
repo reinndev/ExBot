@@ -1,0 +1,8 @@
+{
+    "ignore": [
+        "auth/creds.json",
+        "auth/*",
+        "node_modules/**",
+        "database/*.json"
+    ]
+}

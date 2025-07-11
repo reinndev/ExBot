@@ -1,44 +1,23 @@
 {
   "6282127605956@s.whatsapp.net": {
-    "health": 80,
-    "maxHealth": 120,
-    "gold": 484,
-    "level": 3,
-    "exp": 73,
+    "health": 999999969,
+    "maxHealth": 999999999,
+    "gold": 1000000227,
+    "level": 999999999,
+    "exp": -999999934,
+    "lastOnline": 1752237904,
     "pet": {
-      "id": "pet2",
-      "shields": 0,
-      "lastHeal": 1751792453,
-      "lastShieldRecharge": 0
+      "id": "pet1",
+      "winrateBoost": 0.15
     }
-  },
-  "6288983137832@s.whatsapp.net": {
-    "health": 120,
-    "maxHealth": 120,
-    "gold": 409,
-    "level": 3,
-    "exp": 15,
-    "pet": {
-      "id": "pet4",
-      "shields": 3,
-      "lastHeal": 0,
-      "lastShieldRecharge": 0
-    }
-  },
-  "62895409371300@s.whatsapp.net": {
-    "health": 100,
-    "maxHealth": 100,
-    "gold": 0,
-    "level": 1,
-    "exp": 0,
-    "pet": {}
   },
   "62816560709@s.whatsapp.net": {
-    "health": 100,
+    "health": 90,
     "maxHealth": 100,
-    "gold": 0,
+    "gold": 106,
     "level": 1,
-    "exp": 0,
+    "exp": 37,
+    "lastOnline": 1752234611,
     "pet": {}
   }
 }

@@ -16,7 +16,7 @@
     "pet3": {
         "name": "pet3",
         "description": "Menerima 0 damage saat kalah dalam suatu pertaruangan, efek ini tidak bekerja pada Boss",
-        "effect": { "shield": 3, "rechargeTime": 2400 },
+        "effect": { "shield": 3, "rechargeTime": 2400, "maxShields": 3 },
         "rarity": "Legendary",
         "dropRate": 0.01
     },
@@ -26,6 +26,7 @@
         "effect": {
             "winrateBoost": 0.1,
             "shield": 3,
+            "maxShields": 3,
             "rechargeTime": 2400
         },
         "rarity": "Mythical",
